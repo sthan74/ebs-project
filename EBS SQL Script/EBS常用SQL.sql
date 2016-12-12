@@ -180,3 +180,39 @@ select gcc.segment3,
    and gjl.period_name like '16%'
  group by gcc.segment3--, gjl.period_name
  order by gjl.period_name
+
+-- 查询电商订单中已销账的发票，订单明细
+select a.*
+  from (select hou.name,
+               hp.party_name,
+               ta.trx_date,
+               ta.trx_number,
+               tl.sales_order,
+               oola.attribute17,
+               aps.amount_due_original,
+               aps.amount_due_remaining,
+               tl.description,
+               tl.quantity_ordered,
+               tl.quantity_credited,
+               tl.quantity_invoiced,
+               tl.extended_amount
+          from ra_customer_trx_lines_all tl
+          join oe_order_lines_all oola
+            on oola.line_id = tl.interface_line_attribute6
+           and oola.attribute17 is not null -- POS单号
+        --and oola.ship_to_org_id = '48775' --and oola.ship_from_org_id = '129'
+          join ar_payment_schedules_all aps
+            on aps.customer_trx_id = tl.customer_trx_id
+          join hr_all_organization_units hou
+            on hou.organization_id = oola.ship_from_org_id
+          join ra_customer_trx_all ta
+            on ta.customer_trx_id = tl.customer_trx_id
+          join hz_cust_accounts hca
+            on ta.bill_to_customer_id = hca.cust_account_id
+          join hz_parties hp
+            on hca.party_id = hp.party_id
+           and hp.party_name = 'POS通用客户'
+         where tl.sales_order is not null -- 排除内部交易) a
+ where a.amount_due_remaining = 0 -- 已销帐部分
+    or (a.amount_due_remaining <> 0 and
+       (a.amount_due_original - a.amount_due_remaining) > 0) -- 部分销账部分
